@@ -101,11 +101,6 @@ The library provides two fixers that wrap the entire PHP-CS-Fixer pipeline:
 
 This allows other fixers (e.g. `braces`, `indentation_type`) to work on PHP code without extra indentation and format it correctly. Once formatting is complete, the HTML context indentation is restored.
 
-### Limitations
-
-- Base indentation is detected for **tabs only**. PHP blocks preceded by spaces are not modified.
-- The fixers operate on multi-line `<?php ... ?>` blocks. Single-line PHP tags (no newline after `<?php`) are skipped.
-
 ## Requirements
 
 - PHP >= 8.1

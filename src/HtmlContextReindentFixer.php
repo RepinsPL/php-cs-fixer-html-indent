@@ -61,11 +61,36 @@ final class HtmlContextReindentFixer extends AbstractFixer
 			}
 
 			$this->restoreInlineHtmlIndent($tokens, $index, $baseIndent);
-			$this->reindentBlock($tokens, $index, $closeIndex, $baseIndent);
+
+			$indentUnit = $this->detectIndentUnit($tokens, $index, $closeIndex);
+			$codeIndent = $baseIndent . $indentUnit;
+			$this->reindentBlock($tokens, $index, $closeIndex, $codeIndent, $baseIndent);
 		}
 	}
 
-	private function restoreInlineHtmlIndent(Tokens $tokens, int $openTagIndex, int $n): void
+	private function detectIndentUnit(Tokens $tokens, int $openIndex, int $closeIndex): string
+	{
+		$minIndent = null;
+
+		for ($i = $openIndex + 1; $i < $closeIndex; ++$i) {
+			if (!$tokens[$i]->isGivenKind(T_WHITESPACE)) {
+				continue;
+			}
+
+			$content = $tokens[$i]->getContent();
+			if (preg_match_all('/\n(\t+| +)/', $content, $matches)) {
+				foreach ($matches[1] as $indent) {
+					if ($minIndent === null || strlen($indent) < strlen($minIndent)) {
+						$minIndent = $indent;
+					}
+				}
+			}
+		}
+
+		return $minIndent ?? '    ';
+	}
+
+	private function restoreInlineHtmlIndent(Tokens $tokens, int $openTagIndex, string $baseIndent): void
 	{
 		$prevIndex = $openTagIndex - 1;
 		if ($prevIndex < 0 || !$tokens[$prevIndex]->isGivenKind(T_INLINE_HTML)) {
@@ -73,30 +98,27 @@ final class HtmlContextReindentFixer extends AbstractFixer
 		}
 
 		$content = $tokens[$prevIndex]->getContent();
-		$tabs = str_repeat("\t", $n);
-		$tokens[$prevIndex] = new Token([T_INLINE_HTML, $content . $tabs]);
+		$tokens[$prevIndex] = new Token([T_INLINE_HTML, $content . $baseIndent]);
 	}
 
-	private function reindentBlock(Tokens $tokens, int $openIndex, int $closeIndex, int $n): void
+	private function reindentBlock(Tokens $tokens, int $openIndex, int $closeIndex, string $codeIndent, string $baseIndent): void
 	{
-		$tabs = str_repeat("\t", $n);
-
 		// Handle first token after T_OPEN_TAG — may have been cleared by dedent
 		$firstIndex = $openIndex + 1;
 		if ($firstIndex < $closeIndex) {
 			$firstContent = $tokens[$firstIndex]->getContent();
 			if ($firstContent === '') {
-				// Cleared token (from dedent) — replace with base indent
-				$tokens[$firstIndex] = new Token([T_WHITESPACE, $tabs]);
+				// Cleared token (from dedent) — replace with code indent
+				$tokens[$firstIndex] = new Token([T_WHITESPACE, $codeIndent]);
 			} elseif (!$tokens[$firstIndex]->isGivenKind([T_WHITESPACE, T_COMMENT, T_DOC_COMMENT])) {
-				// Non-whitespace token right after T_OPEN_TAG — insert base indent
-				$tokens->insertAt($firstIndex, new Token([T_WHITESPACE, $tabs]));
+				// Non-whitespace token right after T_OPEN_TAG — insert code indent
+				$tokens->insertAt($firstIndex, new Token([T_WHITESPACE, $codeIndent]));
 				$closeIndex++;
 			} else {
-				// Regular whitespace token — add base indent
-				$newContent = preg_replace('/\n(?!\n)/', "\n" . $tabs, $firstContent);
+				// Regular whitespace token — replace leading indent, add to subsequent lines
+				$newContent = preg_replace('/\n(?!\n)/', "\n" . $codeIndent, $firstContent);
 				if (!str_starts_with($newContent, "\n")) {
-					$newContent = $tabs . $newContent;
+					$newContent = preg_replace('/^[ \t]*/', $codeIndent, $newContent);
 				}
 				if ($newContent !== $firstContent) {
 					$tokens[$firstIndex] = new Token([$tokens[$firstIndex]->getId(), $newContent]);
@@ -111,7 +133,18 @@ final class HtmlContextReindentFixer extends AbstractFixer
 			}
 
 			$content = $tokens[$i]->getContent();
-			$newContent = preg_replace('/\n(?!\n)/', "\n" . $tabs, $content);
+
+			// Last whitespace before T_CLOSE_TAG: align with <?php (baseIndent)
+			if ($i === $closeIndex - 1) {
+				$lastNewline = strrpos($content, "\n");
+				if ($lastNewline !== false) {
+					$newContent = substr($content, 0, $lastNewline + 1) . $baseIndent;
+				} else {
+					$newContent = $content;
+				}
+			} else {
+				$newContent = preg_replace('/\n(?!\n)/', "\n" . $codeIndent, $content);
+			}
 
 			if ($newContent !== $content) {
 				$tokens[$i] = new Token([$tokens[$i]->getId(), $newContent]);

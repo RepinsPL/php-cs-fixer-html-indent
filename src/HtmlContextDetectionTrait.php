@@ -10,9 +10,9 @@ trait HtmlContextDetectionTrait
 {
 	/**
 	 * For a T_OPEN_TAG at position $index, detects the base indentation from HTML context.
-	 * Returns the number of tabs or null if the block doesn't need protection.
+	 * Returns the indent string (tabs or spaces) or null if the block doesn't need protection.
 	 */
-	private function detectBaseIndent(Tokens $tokens, int $index): ?int
+	private function detectBaseIndent(Tokens $tokens, int $index): ?string
 	{
 		$openTag = $tokens[$index];
 
@@ -39,12 +39,38 @@ trait HtmlContextDetectionTrait
 
 		$lastLine = substr($content, $lastNewline + 1);
 
-		// Last line must consist entirely of tabs
-		if ($lastLine === '' or !preg_match('/^\t+$/', $lastLine)) {
+		// Last line must consist entirely of tabs or spaces (not mixed)
+		if ($lastLine === '' || !preg_match('/^(\t+| +)$/', $lastLine)) {
 			return null;
 		}
 
-		return strlen($lastLine);
+		return $lastLine;
+	}
+
+	/**
+	 * Detects the code indent from the first whitespace token after T_OPEN_TAG.
+	 * Returns the indent string or null if no code indent is found.
+	 */
+	private function detectCodeIndent(Tokens $tokens, int $index): ?string
+	{
+		$firstIndex = $index + 1;
+		if ($firstIndex >= $tokens->count()) {
+			return null;
+		}
+
+		if (!$tokens[$firstIndex]->isGivenKind(T_WHITESPACE)) {
+			return null;
+		}
+
+		$content = $tokens[$firstIndex]->getContent();
+		$firstNewline = strpos($content, "\n");
+		$indent = ($firstNewline !== false) ? substr($content, 0, $firstNewline) : $content;
+
+		if ($indent === '' || !preg_match('/^(\t+| +)$/', $indent)) {
+			return null;
+		}
+
+		return $indent;
 	}
 
 	/**
