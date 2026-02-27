@@ -32,6 +32,16 @@ composer test
 
 Always run `composer test` after making changes to verify nothing is broken.
 
+## Development workflow
+
+Follow test-driven development (TDD):
+
+1. **First write a failing test** that describes the expected behavior of the new feature or bug fix.
+2. **Then implement** the code until the test passes.
+3. **Never modify a test to make it pass artificially** — if a test fails, fix the implementation, not the test.
+
+All tests must be **100% end-to-end**: they invoke the real `php-cs-fixer fix` CLI via `Symfony\Component\Process\Process` (see `AbstractFixerTestCase::runPhpCsFixer()`). Do not test fixers by calling their internal methods directly.
+
 No linter or CI yet — the project has no `phpstan.neon` or pipeline.
 
 ## Architecture
