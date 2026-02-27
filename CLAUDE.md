@@ -32,6 +32,8 @@ composer test
 
 Always run `composer test` after making changes to verify nothing is broken.
 
+After any significant change, check whether `README.md` needs to be updated (e.g. new features, changed requirements, modified public API or configuration).
+
 ## Development workflow
 
 Follow test-driven development (TDD):
@@ -40,7 +42,7 @@ Follow test-driven development (TDD):
 2. **Then implement** the code until the test passes.
 3. **Never modify a test to make it pass artificially** — if a test fails, fix the implementation, not the test.
 
-All tests must be **100% end-to-end**: they invoke the real `php-cs-fixer fix` CLI via `Symfony\Component\Process\Process` (see `AbstractFixerTestCase::runPhpCsFixer()`). Do not test fixers by calling their internal methods directly.
+All tests must be **100% end-to-end**: they invoke the real `php-cs-fixer fix` CLI via `exec()` (see `AbstractFixerTestCase::runPhpCsFixer()`). Do not test fixers by calling their internal methods directly.
 
 No linter or CI yet — the project has no `phpstan.neon` or pipeline.
 
@@ -61,3 +63,5 @@ Four files in `src/`, namespace `RepinsPL\PhpCsFixerHtmlIndent\` (PSR-4):
 - Regex `/\n(?!\n)/` in reindent — negative lookahead prevents adding indentation before empty lines.
 - Base indentation detection supports **tabs only** (`^\t+$`), not spaces.
 - Requirements: PHP >= 8.1, php-cs-fixer ^3.0.
+- **Never rely on transitive dependencies** — every package used in the code must be explicitly declared in `composer.json` (`require` or `require-dev`).
+- **Minimize dependencies** — avoid adding packages unless they are truly essential and provide significant value over native PHP solutions. Prefer built-in PHP functions (`exec`, `proc_open`, etc.) over convenience wrappers.
