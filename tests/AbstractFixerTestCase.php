@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace RepinsPL\PhpCsFixerHtmlIndent\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Process\Process;
 
 abstract class AbstractFixerTestCase extends TestCase
 {
@@ -36,25 +35,23 @@ abstract class AbstractFixerTestCase extends TestCase
 
 		$phpCsFixerBin = dirname(__DIR__) . '/vendor/bin/php-cs-fixer';
 
-		$process = new Process([
-			PHP_BINARY,
-			$phpCsFixerBin,
-			'fix',
-			'--config=' . $configFile,
-			'--using-cache=no',
-			'--allow-risky=yes',
-		]);
+		$cmd = sprintf(
+			'%s %s fix %s %s %s 2>&1',
+			escapeshellarg(PHP_BINARY),
+			escapeshellarg($phpCsFixerBin),
+			escapeshellarg('--config=' . $configFile),
+			escapeshellarg('--using-cache=no'),
+			escapeshellarg('--allow-risky=yes'),
+		);
 
-		$process->setTimeout(30);
-		$process->run();
+		exec($cmd, $output, $exitCode);
 
 		// php-cs-fixer returns 0 (no changes) or 8 (changes applied) on success
-		if (!in_array($process->getExitCode(), [0, 8], true)) {
+		if (!in_array($exitCode, [0, 8], true)) {
 			$this->fail(sprintf(
-				"php-cs-fixer failed with exit code %d.\nSTDOUT: %s\nSTDERR: %s",
-				$process->getExitCode(),
-				$process->getOutput(),
-				$process->getErrorOutput(),
+				"php-cs-fixer failed with exit code %d.\nOutput: %s",
+				$exitCode,
+				implode("\n", $output),
 			));
 		}
 
