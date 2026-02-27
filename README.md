@@ -105,7 +105,7 @@ Both tab-based and space-based indentation are supported. The base indentation s
 
 ## Requirements
 
-- PHP >= 8.1
+- PHP >= 8.0
 - PHP-CS-Fixer ^3.0
 
 ## License
