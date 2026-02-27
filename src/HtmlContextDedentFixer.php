@@ -56,13 +56,15 @@ final class HtmlContextDedentFixer extends AbstractFixer
 				continue;
 			}
 
+			$codeIndent = $this->detectCodeIndent($tokens, $index) ?? $baseIndent;
+
 			IndentRegistry::push(spl_object_id($tokens), $baseIndent);
 			$this->stripInlineHtmlIndent($tokens, $index, $baseIndent);
-			$this->dedentBlock($tokens, $index, $closeIndex, $baseIndent);
+			$this->dedentBlock($tokens, $index, $closeIndex, $codeIndent);
 		}
 	}
 
-	private function stripInlineHtmlIndent(Tokens $tokens, int $openTagIndex, int $n): void
+	private function stripInlineHtmlIndent(Tokens $tokens, int $openTagIndex, string $baseIndent): void
 	{
 		$prevIndex = $openTagIndex - 1;
 		if ($prevIndex < 0) {
@@ -70,22 +72,25 @@ final class HtmlContextDedentFixer extends AbstractFixer
 		}
 
 		$content = $tokens[$prevIndex]->getContent();
-		$tokens[$prevIndex] = new Token([T_INLINE_HTML, substr($content, 0, -$n)]);
+		$tokens[$prevIndex] = new Token([T_INLINE_HTML, substr($content, 0, -strlen($baseIndent))]);
 	}
 
-	private function dedentBlock(Tokens $tokens, int $openIndex, int $closeIndex, int $n): void
+	private function dedentBlock(Tokens $tokens, int $openIndex, int $closeIndex, string $codeIndent): void
 	{
+		$char = preg_quote($codeIndent[0], '/');
+		$count = strlen($codeIndent);
+
 		for ($i = $openIndex + 1; $i < $closeIndex; ++$i) {
 			if (!$tokens[$i]->isGivenKind([T_WHITESPACE, T_COMMENT, T_DOC_COMMENT])) {
 				continue;
 			}
 
 			$content = $tokens[$i]->getContent();
-			$newContent = preg_replace('/\n\t{1,' . $n . '}/', "\n", $content);
+			$newContent = preg_replace('/\n' . $char . '{1,' . $count . '}/', "\n", $content);
 
-			// First token after T_OPEN_TAG: also strip leading tabs (T_OPEN_TAG ends with \n)
+			// First token after T_OPEN_TAG: also strip leading indent (T_OPEN_TAG ends with \n)
 			if ($i === $openIndex + 1) {
-				$newContent = preg_replace('/^\t{1,' . $n . '}/', '', $newContent);
+				$newContent = preg_replace('/^' . $char . '{1,' . $count . '}/', '', $newContent);
 			}
 
 			if ($newContent !== $content) {

@@ -21,7 +21,7 @@ abstract class AbstractFixerTestCase extends TestCase
 	 *
 	 * @param array<string, mixed> $rules
 	 */
-	protected function runPhpCsFixer(string $inputCode, array $rules): string
+	protected function runPhpCsFixer(string $inputCode, array $rules, ?string $indent = null): string
 	{
 		$this->tempDir = sys_get_temp_dir() . '/phpcsf-test-' . uniqid();
 		mkdir($this->tempDir, 0777, true);
@@ -29,7 +29,7 @@ abstract class AbstractFixerTestCase extends TestCase
 		$testFile = $this->tempDir . '/test.php';
 		file_put_contents($testFile, $inputCode);
 
-		$configContent = $this->generateConfig($testFile, $rules);
+		$configContent = $this->generateConfig($testFile, $rules, $indent);
 		$configFile = $this->tempDir . '/.php-cs-fixer.dist.php';
 		file_put_contents($configFile, $configContent);
 
@@ -61,11 +61,14 @@ abstract class AbstractFixerTestCase extends TestCase
 	/**
 	 * @param array<string, mixed> $rules
 	 */
-	private function generateConfig(string $testFile, array $rules): string
+	private function generateConfig(string $testFile, array $rules, ?string $indent = null): string
 	{
 		$rulesExport = var_export($rules, true);
 		$finderDir = var_export(dirname($testFile), true);
 		$fileName = var_export(basename($testFile), true);
+		$indentLine = $indent !== null
+			? "\n\t\t\t\t->setIndent(" . var_export($indent, true) . ')'
+			: '';
 
 		return <<<PHP
 			<?php
@@ -80,7 +83,7 @@ abstract class AbstractFixerTestCase extends TestCase
 				->name({$fileName});
 
 			return (new Config())
-				->setFinder(\$finder)
+				->setFinder(\$finder){$indentLine}
 				->registerCustomFixers([
 					new HtmlContextDedentFixer(),
 					new HtmlContextReindentFixer(),

@@ -50,7 +50,7 @@ No linter or CI yet — the project has no `phpstan.neon` or pipeline.
 
 Four files in `src/`, namespace `RepinsPL\PhpCsFixerHtmlIndent\` (PSR-4):
 
-- **HtmlContextDetectionTrait** — shared logic: `detectBaseIndent()` detects the number of tabs from the preceding `T_INLINE_HTML`, `findBlockClose()` finds the matching `T_CLOSE_TAG`.
+- **HtmlContextDetectionTrait** — shared logic: `detectBaseIndent()` detects the base indent string (tabs or spaces) from the preceding `T_INLINE_HTML`, `findBlockClose()` finds the matching `T_CLOSE_TAG`.
 - **HtmlContextDedentFixer** (`RepinsPL/html_context_dedent`, priority 1000) — runs before other fixers, strips base HTML indentation from PHP blocks and T_INLINE_HTML trailing tabs so formatting fixers (like `statement_indentation`) work on "clean" code.
 - **HtmlContextReindentFixer** (`RepinsPL/html_context_reindent`, priority -1000) — runs after all fixers, restores base indentation to both PHP blocks and T_INLINE_HTML while preserving the formatting applied in the HTML context.
 - **IndentRegistry** — static registry for sharing base indent values between dedent and reindent fixers. Both fixers iterate tokens in the same reverse order, so push/shift ordering is guaranteed.
@@ -61,7 +61,7 @@ Four files in `src/`, namespace `RepinsPL\PhpCsFixerHtmlIndent\` (PSR-4):
 - Dedent strips trailing tabs from `T_INLINE_HTML` before `<?php` and stores the base indent in `IndentRegistry`; reindent reads from the registry and restores the tabs. This ensures fixers like `statement_indentation` don't see the HTML context indent and add unwanted extra indentation.
 - Dedent uses `clearAt()` instead of removing tokens — reindent checks for cleared tokens and recreates them as `T_WHITESPACE`.
 - Regex `/\n(?!\n)/` in reindent — negative lookahead prevents adding indentation before empty lines.
-- Base indentation detection supports **tabs only** (`^\t+$`), not spaces.
+- Base indentation detection supports **tabs or spaces** (`^(\t+| +)$`), but not mixed tabs and spaces on the same line.
 - Requirements: PHP >= 8.1, php-cs-fixer ^3.0.
 - **Never rely on transitive dependencies** — every package used in the code must be explicitly declared in `composer.json` (`require` or `require-dev`).
 - **Minimize dependencies** — avoid adding packages unless they are truly essential and provide significant value over native PHP solutions. Prefer built-in PHP functions (`exec`, `proc_open`, etc.) over convenience wrappers.
