@@ -39,6 +39,8 @@ final class HtmlContextDedentFixer extends AbstractFixer
 
 	protected function applyFix(\SplFileInfo $file, Tokens $tokens): void
 	{
+		IndentRegistry::clear(spl_object_id($tokens));
+
 		for ($index = $tokens->count() - 1; $index >= 0; --$index) {
 			if (!$tokens[$index]->isGivenKind(T_OPEN_TAG)) {
 				continue;
@@ -54,8 +56,21 @@ final class HtmlContextDedentFixer extends AbstractFixer
 				continue;
 			}
 
+			IndentRegistry::push(spl_object_id($tokens), $baseIndent);
+			$this->stripInlineHtmlIndent($tokens, $index, $baseIndent);
 			$this->dedentBlock($tokens, $index, $closeIndex, $baseIndent);
 		}
+	}
+
+	private function stripInlineHtmlIndent(Tokens $tokens, int $openTagIndex, int $n): void
+	{
+		$prevIndex = $openTagIndex - 1;
+		if ($prevIndex < 0) {
+			return;
+		}
+
+		$content = $tokens[$prevIndex]->getContent();
+		$tokens[$prevIndex] = new Token([T_INLINE_HTML, substr($content, 0, -$n)]);
 	}
 
 	private function dedentBlock(Tokens $tokens, int $openIndex, int $closeIndex, int $n): void
