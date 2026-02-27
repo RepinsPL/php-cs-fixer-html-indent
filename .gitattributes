@@ -1,0 +1,6 @@
+/tests/                 export-ignore
+/phpunit.xml.dist       export-ignore
+/CLAUDE.md              export-ignore
+/.php-cs-fixer.dist.php export-ignore
+/.gitignore             export-ignore
+/.gitattributes         export-ignore

@@ -3,6 +3,16 @@
     "description": "PHP-CS-Fixer custom fixers that preserve HTML-context indentation in mixed PHP/HTML files",
     "type": "library",
     "license": "MIT",
+    "keywords": ["php-cs-fixer", "fixer", "html", "indentation", "blade", "template"],
+    "authors": [
+        {
+            "name": "RepinsPL"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/repinspl/php-cs-fixer-html-indent/issues",
+        "source": "https://github.com/repinspl/php-cs-fixer-html-indent"
+    },
     "autoload": {
         "psr-4": {
             "RepinsPL\\PhpCsFixerHtmlIndent\\": "src/"
