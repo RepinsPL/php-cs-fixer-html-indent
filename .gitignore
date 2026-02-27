@@ -3,3 +3,6 @@
 /vendor/
 .php-cs-fixer.cache
 composer.lock
+.idea/
+.vscode/
+.DS_Store
