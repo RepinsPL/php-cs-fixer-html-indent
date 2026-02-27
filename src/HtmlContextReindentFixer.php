@@ -44,7 +44,13 @@ final class HtmlContextReindentFixer extends AbstractFixer
 				continue;
 			}
 
-			$baseIndent = $this->detectBaseIndent($tokens, $index);
+			$baseIndent = IndentRegistry::shift(spl_object_id($tokens));
+
+			if ($baseIndent === null) {
+				// Fallback: detect from T_INLINE_HTML (for cases without dedent)
+				$baseIndent = $this->detectBaseIndent($tokens, $index);
+			}
+
 			if ($baseIndent === null) {
 				continue;
 			}
@@ -54,8 +60,21 @@ final class HtmlContextReindentFixer extends AbstractFixer
 				continue;
 			}
 
+			$this->restoreInlineHtmlIndent($tokens, $index, $baseIndent);
 			$this->reindentBlock($tokens, $index, $closeIndex, $baseIndent);
 		}
+	}
+
+	private function restoreInlineHtmlIndent(Tokens $tokens, int $openTagIndex, int $n): void
+	{
+		$prevIndex = $openTagIndex - 1;
+		if ($prevIndex < 0 || !$tokens[$prevIndex]->isGivenKind(T_INLINE_HTML)) {
+			return;
+		}
+
+		$content = $tokens[$prevIndex]->getContent();
+		$tabs = str_repeat("\t", $n);
+		$tokens[$prevIndex] = new Token([T_INLINE_HTML, $content . $tabs]);
 	}
 
 	private function reindentBlock(Tokens $tokens, int $openIndex, int $closeIndex, int $n): void
