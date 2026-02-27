@@ -1,12 +1,12 @@
 # PHP-CS-Fixer HTML Indent
 
-Custom fixery dla [PHP-CS-Fixer](https://github.com/PHP-CS-Fixer/PHP-CS-Fixer), które zachowują indentację bloków PHP osadzonych w plikach HTML/Blade.
+Custom fixers for [PHP-CS-Fixer](https://github.com/PHP-CS-Fixer/PHP-CS-Fixer) that preserve indentation of PHP blocks embedded in HTML/Blade files.
 
-## Problem
+## The problem
 
-PHP-CS-Fixer formatuje bloki PHP bez uwzględnienia kontekstu HTML, w którym się znajdują. W plikach mieszanych (np. szablonach Blade) prowadzi to do złamania indentacji:
+PHP-CS-Fixer formats PHP blocks without considering the surrounding HTML context. In mixed files (e.g. Blade templates) this breaks the indentation:
 
-**Przed uruchomieniem php-cs-fixer** — poprawna indentacja w kontekście HTML:
+**Before running php-cs-fixer** — correct indentation within the HTML context:
 ```html
 <div>
 	<main>
@@ -23,7 +23,7 @@ PHP-CS-Fixer formatuje bloki PHP bez uwzględnienia kontekstu HTML, w którym si
 </div>
 ```
 
-**Po uruchomieniu php-cs-fixer** — indentacja kontekstu HTML zostaje utracona:
+**After running php-cs-fixer** — HTML context indentation is lost:
 ```html
 <div>
 	<main>
@@ -40,7 +40,7 @@ foreach ($users as $user) {
 </div>
 ```
 
-**Z tą biblioteką** — php-cs-fixer formatuje PHP, a indentacja HTML zostaje zachowana:
+**With this library** — php-cs-fixer formats the PHP while the HTML indentation is preserved:
 ```html
 <div>
 	<main>
@@ -57,15 +57,15 @@ foreach ($users as $user) {
 </div>
 ```
 
-## Instalacja
+## Installation
 
 ```bash
 composer require --dev repinspl/php-cs-fixer-html-indent
 ```
 
-## Konfiguracja
+## Configuration
 
-W pliku `.php-cs-fixer.dist.php` zarejestruj oba fixery i włącz odpowiadające im reguły:
+Register both fixers and enable their rules in your `.php-cs-fixer.dist.php`:
 
 ```php
 <?php
@@ -78,7 +78,7 @@ $fixers = [
 return (new PhpCsFixer\Config())
     ->registerCustomFixers($fixers)
     ->setRules([
-        // Twoje pozostałe reguły...
+        // Your other rules...
         'RepinsPL/html_context_dedent' => true,
         'RepinsPL/html_context_reindent' => true,
     ])
@@ -88,29 +88,29 @@ return (new PhpCsFixer\Config())
     );
 ```
 
-> **Ważne:** Oba fixery muszą być włączone razem. Dedent bez reindent usunie indentację bez jej przywrócenia.
+> **Important:** Both fixers must be enabled together. Dedent without reindent will strip the indentation without restoring it.
 
-## Jak to działa
+## How it works
 
-Biblioteka dostarcza dwa fixery, które opakowują cały pipeline PHP-CS-Fixera:
+The library provides two fixers that wrap the entire PHP-CS-Fixer pipeline:
 
-| Fixer | Priorytet | Rola |
+| Fixer | Priority | Role |
 |---|---|---|
-| `RepinsPL/html_context_dedent` | `1000` | **Przed** innymi fixerami — usuwa bazową indentację HTML z bloków PHP |
-| `RepinsPL/html_context_reindent` | `-1000` | **Po** wszystkich fixerach — przywraca bazową indentację HTML |
+| `RepinsPL/html_context_dedent` | `1000` | **Before** other fixers — strips base HTML indentation from PHP blocks |
+| `RepinsPL/html_context_reindent` | `-1000` | **After** all fixers — restores base HTML indentation |
 
-Dzięki temu pozostałe fixery (np. `braces`, `indentation_type`) pracują na kodzie PHP bez dodatkowej indentacji i mogą go poprawnie sformatować. Po zakończeniu formatowania indentacja kontekstu HTML zostaje przywrócona.
+This allows other fixers (e.g. `braces`, `indentation_type`) to work on PHP code without extra indentation and format it correctly. Once formatting is complete, the HTML context indentation is restored.
 
-### Ograniczenia
+### Limitations
 
-- Bazowa indentacja jest wykrywana wyłącznie dla **tabulacji**. Bloki PHP poprzedzone spacjami nie są modyfikowane.
-- Fixer operuje na wieloliniowych blokach `<?php ... ?>`. Jednoliniowe tagi PHP (bez znaku nowej linii po `<?php`) są pomijane.
+- Base indentation is detected for **tabs only**. PHP blocks preceded by spaces are not modified.
+- The fixers operate on multi-line `<?php ... ?>` blocks. Single-line PHP tags (no newline after `<?php`) are skipped.
 
-## Wymagania
+## Requirements
 
 - PHP >= 8.1
 - PHP-CS-Fixer ^3.0
 
-## Licencja
+## License
 
 [MIT](https://opensource.org/licenses/MIT)

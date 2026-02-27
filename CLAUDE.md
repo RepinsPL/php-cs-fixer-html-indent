@@ -2,18 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Opis projektu
+## Language
 
-Biblioteka PHP dostarczająca dwa custom fixery dla php-cs-fixer, które zachowują bazową indentację bloków PHP osadzonych w HTML. Fixery pracują w tandemie: dedent (priority 1000) usuwa indentację HTML przed formatowaniem, reindent (priority -1000) przywraca ją po formatowaniu.
+This project is conducted entirely in English — all code, comments, commits, documentation, and Claude Code communication.
 
-## Komendy
+## Project overview
+
+A PHP library providing two custom PHP-CS-Fixer fixers that preserve base indentation of PHP blocks embedded in HTML. The fixers work in tandem: dedent (priority 1000) strips HTML indentation before formatting, reindent (priority -1000) restores it after.
+
+## Commands
 
 ```bash
-# Instalacja zależności
+# Install dependencies
 composer install
 
-# Uruchomienie fixerów (wymaga konfiguracji w projekcie-hoście)
-# W .php-cs-fixer.dist.php projektu dodaj:
+# Running the fixers (requires configuration in the host project)
+# In the project's .php-cs-fixer.dist.php add:
 #   ->registerCustomFixers([
 #       new \RepinsPL\PhpCsFixerHtmlIndent\HtmlContextDedentFixer(),
 #       new \RepinsPL\PhpCsFixerHtmlIndent\HtmlContextReindentFixer(),
@@ -21,20 +25,20 @@ composer install
 #   ->setRules(['RepinsPL/html_context_dedent' => true, 'RepinsPL/html_context_reindent' => true])
 ```
 
-Brak testów, lintera i CI — projekt nie ma jeszcze `phpunit.xml`, `phpstan.neon` ani pipeline'u.
+No tests, linter, or CI yet — the project has no `phpunit.xml`, `phpstan.neon`, or pipeline.
 
-## Architektura
+## Architecture
 
-Trzy pliki w `src/`, namespace `RepinsPL\PhpCsFixerHtmlIndent\` (PSR-4):
+Three files in `src/`, namespace `RepinsPL\PhpCsFixerHtmlIndent\` (PSR-4):
 
-- **HtmlContextDetectionTrait** — wspólna logika: `detectBaseIndent()` wykrywa liczbę tabulacji z poprzedzającego `T_INLINE_HTML`, `findBlockClose()` znajduje odpowiadający `T_CLOSE_TAG`.
-- **HtmlContextDedentFixer** (`RepinsPL/html_context_dedent`, priority 1000) — przed innymi fixerami usuwa bazową indentację HTML z bloków PHP, aby fixery formatujące pracowały na "czystym" kodzie.
-- **HtmlContextReindentFixer** (`RepinsPL/html_context_reindent`, priority -1000) — po wszystkich fixerach przywraca bazową indentację, zachowując formatowanie w kontekście HTML.
+- **HtmlContextDetectionTrait** — shared logic: `detectBaseIndent()` detects the number of tabs from the preceding `T_INLINE_HTML`, `findBlockClose()` finds the matching `T_CLOSE_TAG`.
+- **HtmlContextDedentFixer** (`RepinsPL/html_context_dedent`, priority 1000) — runs before other fixers, strips base HTML indentation from PHP blocks so formatting fixers work on "clean" code.
+- **HtmlContextReindentFixer** (`RepinsPL/html_context_reindent`, priority -1000) — runs after all fixers, restores base indentation while preserving the formatting applied in the HTML context.
 
-### Kluczowe decyzje techniczne
+### Key technical decisions
 
-- Oba fixery iterują tokeny **wstecz** (od końca), aby modyfikacje nie przesuwały indeksów wcześniejszych tokenów.
-- Dedent używa `clearAt()` zamiast usuwania tokenów — reindent sprawdza cleared tokens i odtwarza je jako `T_WHITESPACE`.
-- Regex `/\n(?!\n)/` w reindent — negative lookahead zapobiega dodawaniu indentacji przed pustymi liniami.
-- Detekcja bazowej indentacji obsługuje wyłącznie tabulacje (`^\t+$`), nie spacje.
-- Wymagania: PHP >= 8.1, php-cs-fixer ^3.0.
+- Both fixers iterate tokens **in reverse** (from end to start) so modifications don't shift indices of earlier tokens.
+- Dedent uses `clearAt()` instead of removing tokens — reindent checks for cleared tokens and recreates them as `T_WHITESPACE`.
+- Regex `/\n(?!\n)/` in reindent — negative lookahead prevents adding indentation before empty lines.
+- Base indentation detection supports **tabs only** (`^\t+$`), not spaces.
+- Requirements: PHP >= 8.1, php-cs-fixer ^3.0.
