@@ -46,19 +46,26 @@ final class HtmlContextDedentFixer extends AbstractFixer
 				continue;
 			}
 
+			if (!str_ends_with($tokens[$index]->getContent(), "\n")) {
+				continue;
+			}
+
 			$baseIndent = $this->detectBaseIndent($tokens, $index);
+
 			if ($baseIndent === null) {
+				IndentRegistry::push(spl_object_id($tokens), null);
 				continue;
 			}
 
 			$closeIndex = $this->findBlockClose($tokens, $index);
 			if ($closeIndex === null) {
+				IndentRegistry::push(spl_object_id($tokens), null);
 				continue;
 			}
 
 			$codeIndent = $this->detectCodeIndent($tokens, $index) ?? $baseIndent;
 
-			IndentRegistry::push(spl_object_id($tokens), $baseIndent);
+			IndentRegistry::push(spl_object_id($tokens), $baseIndent, $codeIndent);
 			$this->stripInlineHtmlIndent($tokens, $index, $baseIndent);
 			$this->dedentBlock($tokens, $index, $closeIndex, $codeIndent);
 		}

@@ -44,11 +44,18 @@ final class HtmlContextReindentFixer extends AbstractFixer
 				continue;
 			}
 
-			$baseIndent = IndentRegistry::shift(spl_object_id($tokens));
+			if (!str_ends_with($tokens[$index]->getContent(), "\n")) {
+				continue;
+			}
 
-			if ($baseIndent === null) {
+			$registryEntry = IndentRegistry::shift(spl_object_id($tokens));
+
+			if ($registryEntry !== null) {
+				[$baseIndent, $codeIndent] = $registryEntry;
+			} else {
 				// Fallback: detect from T_INLINE_HTML (for cases without dedent)
 				$baseIndent = $this->detectBaseIndent($tokens, $index);
+				$codeIndent = null;
 			}
 
 			if ($baseIndent === null) {
@@ -62,8 +69,7 @@ final class HtmlContextReindentFixer extends AbstractFixer
 
 			$this->restoreInlineHtmlIndent($tokens, $index, $baseIndent);
 
-			$indentUnit = $this->detectIndentUnit($tokens, $index, $closeIndex);
-			$codeIndent = $baseIndent . $indentUnit;
+			$codeIndent ??= $baseIndent . $this->detectIndentUnit($tokens, $index, $closeIndex);
 			$this->reindentBlock($tokens, $index, $closeIndex, $codeIndent, $baseIndent);
 		}
 	}

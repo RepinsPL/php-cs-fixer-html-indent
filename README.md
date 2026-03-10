@@ -103,6 +103,10 @@ This allows other fixers (e.g. `braces`, `indentation_type`) to work on PHP code
 
 Both tab-based and space-based indentation are supported. The base indentation style is detected automatically from the HTML context surrounding each PHP block.
 
+## Contributing
+
+If you find a case where the fixers produce incorrect indentation, please [open an issue](https://github.com/RepinsPL/php-cs-fixer-html-indent/issues) with a minimal PHP/HTML snippet that demonstrates the problem. This helps us write a test and fix the bug.
+
 ## Requirements
 
 - PHP >= 8.0

@@ -15,15 +15,20 @@ namespace RepinsPL\PhpCsFixerHtmlIndent;
  */
 final class IndentRegistry
 {
-	/** @var array<int, list<string>> Keyed by spl_object_id of Tokens */
+	/** @var array<int, list<null|array{string, string}>> Keyed by spl_object_id of Tokens */
 	private static array $pendingIndents = [];
 
-	public static function push(int $tokensId, string $indent): void
+	public static function push(int $tokensId, ?string $baseIndent, ?string $codeIndent = null): void
 	{
-		self::$pendingIndents[$tokensId][] = $indent;
+		self::$pendingIndents[$tokensId][] = $baseIndent !== null
+			? [$baseIndent, $codeIndent ?? $baseIndent]
+			: null;
 	}
 
-	public static function shift(int $tokensId): ?string
+	/**
+	 * @return null|array{string, string} [baseIndent, codeIndent] or null
+	 */
+	public static function shift(int $tokensId): ?array
 	{
 		if (empty(self::$pendingIndents[$tokensId])) {
 			return null;
