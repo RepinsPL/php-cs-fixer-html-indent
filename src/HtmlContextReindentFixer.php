@@ -74,6 +74,36 @@ final class HtmlContextReindentFixer extends AbstractFixer
 		}
 	}
 
+	/**
+	 * Detects the base indentation the formatter (e.g. statement_indentation) applied
+	 * to the whole block. When the block sits inside an outer control structure split
+	 * across an HTML island, every line is shifted right by this amount; it must be
+	 * stripped before re-applying codeIndent so sibling statements line up with the
+	 * first one. The first statement is excluded on purpose: statement_indentation
+	 * leaves it at column 0 (the indenting newline lives in the T_OPEN_TAG token).
+	 */
+	private function detectFormatterBaseIndent(Tokens $tokens, int $openIndex, int $closeIndex): string
+	{
+		$min = null;
+
+		for ($i = $openIndex + 1; $i < $closeIndex; ++$i) {
+			if (!$tokens[$i]->isGivenKind(T_WHITESPACE)) {
+				continue;
+			}
+
+			// Indentation after each newline that precedes real content (skip blank lines).
+			if (preg_match_all('/\n([ \t]*)(?=[^\n \t]|$)/', $tokens[$i]->getContent(), $matches)) {
+				foreach ($matches[1] as $indent) {
+					if ($min === null || strlen($indent) < strlen($min)) {
+						$min = $indent;
+					}
+				}
+			}
+		}
+
+		return $min ?? '';
+	}
+
 	private function detectIndentUnit(Tokens $tokens, int $openIndex, int $closeIndex): string
 	{
 		$minIndent = null;
@@ -109,6 +139,13 @@ final class HtmlContextReindentFixer extends AbstractFixer
 
 	private function reindentBlock(Tokens $tokens, int $openIndex, int $closeIndex, string $codeIndent, string $baseIndent): void
 	{
+		// Base indent the formatter (e.g. statement_indentation) gave the whole block.
+		// When the block sits inside an outer control structure split across an HTML
+		// island, every line is shifted right by this amount; strip it before adding
+		// codeIndent so sibling statements line up, not just the first one.
+		$formatterBase = $this->detectFormatterBaseIndent($tokens, $openIndex, $closeIndex);
+		$stripPattern = '/\n' . preg_quote($formatterBase, '/') . '(?!\n)/';
+
 		// Handle first token after T_OPEN_TAG — may have been cleared by dedent
 		$firstIndex = $openIndex + 1;
 		if ($firstIndex < $closeIndex) {
@@ -122,7 +159,7 @@ final class HtmlContextReindentFixer extends AbstractFixer
 				$closeIndex++;
 			} else {
 				// Regular whitespace token — replace leading indent, add to subsequent lines
-				$newContent = preg_replace('/\n(?!\n)/', "\n" . $codeIndent, $firstContent);
+				$newContent = preg_replace($stripPattern, "\n" . $codeIndent, $firstContent);
 				if (!str_starts_with($newContent, "\n")) {
 					$newContent = preg_replace('/^[ \t]*/', $codeIndent, $newContent);
 				}
@@ -149,7 +186,7 @@ final class HtmlContextReindentFixer extends AbstractFixer
 					$newContent = $content;
 				}
 			} else {
-				$newContent = preg_replace('/\n(?!\n)/', "\n" . $codeIndent, $content);
+				$newContent = preg_replace($stripPattern, "\n" . $codeIndent, $content);
 			}
 
 			if ($newContent !== $content) {
