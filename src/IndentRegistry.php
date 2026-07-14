@@ -37,6 +37,22 @@ final class IndentRegistry
 		return array_shift(self::$pendingIndents[$tokensId]);
 	}
 
+	/**
+	 * Tells whether any not-yet-shifted entry was actually dedented. Entries are
+	 * shifted in reverse file order, so the pending ones belong to blocks earlier
+	 * in the file than the block currently processed by the reindent fixer.
+	 */
+	public static function hasPendingDedented(int $tokensId): bool
+	{
+		foreach (self::$pendingIndents[$tokensId] ?? [] as $entry) {
+			if ($entry !== null) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	public static function clear(int $tokensId): void
 	{
 		unset(self::$pendingIndents[$tokensId]);

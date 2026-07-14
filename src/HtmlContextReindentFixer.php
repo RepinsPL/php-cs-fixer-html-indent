@@ -59,6 +59,7 @@ final class HtmlContextReindentFixer extends AbstractFixer
 			}
 
 			if ($baseIndent === null) {
+				$this->fixSpuriousIndentAfterOpenTag($tokens, $index);
 				continue;
 			}
 
@@ -72,6 +73,102 @@ final class HtmlContextReindentFixer extends AbstractFixer
 			$codeIndent ??= $baseIndent . $this->detectIndentUnit($tokens, $index, $closeIndex);
 			$this->reindentBlock($tokens, $index, $closeIndex, $codeIndent, $baseIndent);
 		}
+	}
+
+	/**
+	 * Removes spurious indentation added to the first statement of an unprotected
+	 * block (one with no HTML base indent). When an earlier block in the file was
+	 * dedented to column 0, statement_indentation records an empty "previous line
+	 * indent" there; the statement scope it opens for the following inline HTML
+	 * stretches past this block's open tag and prefixes the first-statement lines
+	 * with the HTML-context indent. That prefix never comes from real code at the
+	 * top level, so it is stripped; blocks nested in an unclosed brace or
+	 * alternative-syntax scope may be indented legitimately and are left alone.
+	 */
+	private function fixSpuriousIndentAfterOpenTag(Tokens $tokens, int $openIndex): void
+	{
+		if (!IndentRegistry::hasPendingDedented(spl_object_id($tokens))) {
+			return;
+		}
+
+		$wsIndex = $openIndex + 1;
+		if ($wsIndex >= $tokens->count() || !$tokens[$wsIndex]->isGivenKind(T_WHITESPACE)) {
+			return;
+		}
+
+		$content = $tokens[$wsIndex]->getContent();
+		$lastNewline = strrpos($content, "\n");
+		$spurious = $lastNewline === false ? $content : substr($content, $lastNewline + 1);
+
+		if (!preg_match('/^(\t+| +)$/', $spurious)) {
+			return;
+		}
+
+		if (!$this->isTopLevel($tokens, $openIndex)) {
+			return;
+		}
+
+		if ($lastNewline === false) {
+			$tokens->clearAt($wsIndex);
+		} else {
+			$tokens[$wsIndex] = new Token([T_WHITESPACE, substr($content, 0, $lastNewline + 1)]);
+		}
+
+		// Continuation lines of the first statement received the same prefix.
+		$closeIndex = $this->findBlockClose($tokens, $openIndex) ?? $tokens->count();
+		for ($i = $wsIndex + 1; $i < $closeIndex; ++$i) {
+			if (!$tokens[$i]->isGivenKind(T_WHITESPACE)) {
+				continue;
+			}
+
+			$newContent = str_replace("\n" . $spurious, "\n", $tokens[$i]->getContent());
+			if ($newContent !== $tokens[$i]->getContent()) {
+				$tokens[$i] = new Token([T_WHITESPACE, $newContent]);
+			}
+		}
+	}
+
+	/**
+	 * Tells whether the T_OPEN_TAG at $openIndex sits outside any unclosed brace
+	 * or alternative-syntax block, i.e. its statements belong at column 0.
+	 */
+	private function isTopLevel(Tokens $tokens, int $openIndex): bool
+	{
+		$depth = 0;
+
+		for ($i = 0; $i < $openIndex; ++$i) {
+			$token = $tokens[$i];
+
+			if ($token->equals('{')) {
+				++$depth;
+			} elseif ($token->equals('}')) {
+				--$depth;
+			} elseif ($token->isGivenKind([T_ENDIF, T_ENDFOR, T_ENDFOREACH, T_ENDWHILE, T_ENDSWITCH, T_ENDDECLARE])) {
+				--$depth;
+			} elseif (
+				// T_ELSEIF is absent on purpose: `elseif (...):` continues the block
+				// opened by `if (...):` and shares its `endif`.
+				$token->isGivenKind([T_IF, T_FOR, T_FOREACH, T_WHILE, T_SWITCH, T_DECLARE])
+				&& $this->opensAlternativeSyntaxBlock($tokens, $i)
+			) {
+				++$depth;
+			}
+		}
+
+		return $depth === 0;
+	}
+
+	private function opensAlternativeSyntaxBlock(Tokens $tokens, int $index): bool
+	{
+		$parenIndex = $tokens->getNextMeaningfulToken($index);
+		if ($parenIndex === null || !$tokens[$parenIndex]->equals('(')) {
+			return false;
+		}
+
+		$parenCloseIndex = $tokens->findBlockEnd(Tokens::BLOCK_TYPE_PARENTHESIS_BRACE, $parenIndex);
+		$afterParenIndex = $tokens->getNextMeaningfulToken($parenCloseIndex);
+
+		return $afterParenIndex !== null && $tokens[$afterParenIndex]->equals(':');
 	}
 
 	/**
