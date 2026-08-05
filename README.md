@@ -103,6 +103,11 @@ This allows other fixers (e.g. `braces`, `indentation_type`) to work on PHP code
 
 Both tab-based and space-based indentation are supported. The base indentation style is detected automatically from the HTML context surrounding each PHP block.
 
+## Known limitations
+
+- **Contamination inside an unclosed outer scope.** When an earlier block is dedented to column 0, `statement_indentation` can leak a spurious indent into a later, unprotected block (one with no HTML base indent). This is repaired automatically when the later block sits at the top level, but not when it sits inside a still-open brace or alternative-syntax scope (e.g. an unclosed `if`/`foreach`), where added indentation could be legitimate and can't be safely stripped.
+- **Rare unrelated mis-indentation from a correctly-handled block.** In one file out of ~87 seen in production use, a correctly-scoped, correctly-dedented island still left `statement_indentation` in a state that mis-indented unrelated code much later in the same file, well after the island itself had closed. The root cause lives in `statement_indentation`'s own internal line-tracking, which this library has no visibility into from the token level, so it isn't something a token-level fix here can reliably address. If you hit this, please [open an issue](https://github.com/RepinsPL/php-cs-fixer-html-indent/issues) with a minimal reproduction — a fix may still be possible once the triggering pattern is isolated.
+
 ## Contributing
 
 If you find a case where the fixers produce incorrect indentation, please [open an issue](https://github.com/RepinsPL/php-cs-fixer-html-indent/issues) with a minimal PHP/HTML snippet that demonstrates the problem. This helps us write a test and fix the bug.

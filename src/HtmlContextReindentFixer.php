@@ -51,15 +51,22 @@ final class HtmlContextReindentFixer extends AbstractFixer
 			$registryEntry = IndentRegistry::shift(spl_object_id($tokens));
 
 			if ($registryEntry !== null) {
-				[$baseIndent, $codeIndent] = $registryEntry;
+				[$baseIndent, $codeIndent, $closingDepth] = $registryEntry;
 			} else {
 				// Fallback: detect from T_INLINE_HTML (for cases without dedent)
 				$baseIndent = $this->detectBaseIndent($tokens, $index);
 				$codeIndent = null;
+				$closingDepth = 0;
 			}
 
 			if ($baseIndent === null) {
 				$this->fixSpuriousIndentAfterOpenTag($tokens, $index);
+				continue;
+			}
+
+			if ($closingDepth !== 0) {
+				// Dedent left this block untouched for the same reason (see
+				// HtmlContextDedentFixer) — nothing to restore here either.
 				continue;
 			}
 
@@ -84,6 +91,14 @@ final class HtmlContextReindentFixer extends AbstractFixer
 	 * with the HTML-context indent. That prefix never comes from real code at the
 	 * top level, so it is stripped; blocks nested in an unclosed brace or
 	 * alternative-syntax scope may be indented legitimately and are left alone.
+	 *
+	 * Known limitation (separate from the above): a correctly-scoped,
+	 * correctly-dedented block can still leave statement_indentation's own
+	 * internal line-tracking in a state that mis-indents unrelated code much
+	 * later in the same file, after the block itself has closed. This library
+	 * has no visibility into that internal state from the token level, so it
+	 * cannot be reliably detected or repaired here. Observed to be rare (1 in
+	 * ~87 files in one production codebase).
 	 */
 	private function fixSpuriousIndentAfterOpenTag(Tokens $tokens, int $openIndex): void
 	{
@@ -183,7 +198,12 @@ final class HtmlContextReindentFixer extends AbstractFixer
 	{
 		$min = null;
 
-		for ($i = $openIndex + 1; $i < $closeIndex; ++$i) {
+		// Starts at $openIndex + 2, past the first token: that one is handled
+		// separately in reindentBlock() and, per the docblock above, statement_indentation
+		// leaves it at column 0 regardless of real brace depth. Including it here would
+		// pull $min down to '' whenever the block sits inside control structures still
+		// open from outside it, hiding the real depth this method exists to detect.
+		for ($i = $openIndex + 2; $i < $closeIndex; ++$i) {
 			if (!$tokens[$i]->isGivenKind(T_WHITESPACE)) {
 				continue;
 			}
@@ -255,11 +275,16 @@ final class HtmlContextReindentFixer extends AbstractFixer
 				$tokens->insertAt($firstIndex, new Token([T_WHITESPACE, $codeIndent]));
 				$closeIndex++;
 			} else {
-				// Regular whitespace token — replace leading indent, add to subsequent lines
-				$newContent = preg_replace($stripPattern, "\n" . $codeIndent, $firstContent);
-				if (!str_starts_with($newContent, "\n")) {
-					$newContent = preg_replace('/^[ \t]*/', $codeIndent, $newContent);
-				}
+				// Regular whitespace token. Its last line is the lead-in for the
+				// first statement, which — per the docblock above — statement_indentation
+				// leaves at column 0 rather than at real brace depth; it always needs
+				// codeIndent, so it's replaced outright rather than detected via
+				// $stripPattern (which reflects lines 2+, not this one).
+				$lastNewline = strrpos($firstContent, "\n");
+				$newContent = $lastNewline !== false
+					? substr($firstContent, 0, $lastNewline + 1) . $codeIndent
+					: $codeIndent;
+
 				if ($newContent !== $firstContent) {
 					$tokens[$firstIndex] = new Token([$tokens[$firstIndex]->getId(), $newContent]);
 				}
