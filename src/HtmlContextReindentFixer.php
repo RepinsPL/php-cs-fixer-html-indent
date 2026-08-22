@@ -270,7 +270,7 @@ final class HtmlContextReindentFixer extends AbstractFixer
 			if ($firstContent === '') {
 				// Cleared token (from dedent) — replace with code indent
 				$tokens[$firstIndex] = new Token([T_WHITESPACE, $codeIndent]);
-			} elseif (!$tokens[$firstIndex]->isGivenKind([T_WHITESPACE, T_COMMENT, T_DOC_COMMENT])) {
+			} elseif (!$tokens[$firstIndex]->isGivenKind(T_WHITESPACE)) {
 				// Non-whitespace token right after T_OPEN_TAG — insert code indent
 				$tokens->insertAt($firstIndex, new Token([T_WHITESPACE, $codeIndent]));
 				$closeIndex++;
