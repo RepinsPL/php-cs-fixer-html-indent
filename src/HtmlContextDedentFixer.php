@@ -64,8 +64,21 @@ final class HtmlContextDedentFixer extends AbstractFixer
 			}
 
 			$codeIndent = $this->detectCodeIndent($tokens, $index) ?? $baseIndent;
+			$closingDepth = $this->braceDepthBeforeClose($tokens, $index, $closeIndex);
 
-			IndentRegistry::push(spl_object_id($tokens), $baseIndent, $codeIndent);
+			IndentRegistry::push(spl_object_id($tokens), $baseIndent, $codeIndent, $closingDepth);
+
+			if ($closingDepth !== 0) {
+				// Braces opened inside this block (e.g. an `if`/`foreach` wrapping
+				// HTML) aren't closed by the time we reach this close tag — their
+				// matching closing braces live in a later, unprotected island.
+				// Dedenting here would shift statement_indentation's view of that
+				// still-open scope for everything downstream, and reindentBlock has
+				// no reach into that later island to correct it back. Leave the
+				// whole block untouched; stock fixers already handle this case.
+				continue;
+			}
+
 			$this->stripInlineHtmlIndent($tokens, $index, $baseIndent);
 			$this->dedentBlock($tokens, $index, $closeIndex, $codeIndent);
 		}
