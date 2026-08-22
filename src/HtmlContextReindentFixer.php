@@ -91,14 +91,6 @@ final class HtmlContextReindentFixer extends AbstractFixer
 	 * with the HTML-context indent. That prefix never comes from real code at the
 	 * top level, so it is stripped; blocks nested in an unclosed brace or
 	 * alternative-syntax scope may be indented legitimately and are left alone.
-	 *
-	 * Known limitation (separate from the above): a correctly-scoped,
-	 * correctly-dedented block can still leave statement_indentation's own
-	 * internal line-tracking in a state that mis-indents unrelated code much
-	 * later in the same file, after the block itself has closed. This library
-	 * has no visibility into that internal state from the token level, so it
-	 * cannot be reliably detected or repaired here. Observed to be rare (1 in
-	 * ~87 files in one production codebase).
 	 */
 	private function fixSpuriousIndentAfterOpenTag(Tokens $tokens, int $openIndex): void
 	{
