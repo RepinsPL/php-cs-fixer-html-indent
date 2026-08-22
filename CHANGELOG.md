@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.4] - 2026-08-22
+
+### Fixed
+
+- `findBlockClose()` no longer treats a PHP block as spanning past the brace that closes its enclosing scope (e.g. a method ending before the next HTML island), which mangled the closing brace and the next method's signature ([#1](https://github.com/repinspl/php-cs-fixer-html-indent/issues/1)).
+- PHP blocks whose braces are unbalanced at their own close tag (e.g. an `if`/`foreach` split across an HTML island) are now left untouched by both fixers instead of desyncing `statement_indentation` for the rest of the file.
+
+Thanks to [@brianlmoon](https://github.com/brianlmoon) for reporting, fixing and testing both issues ([#2](https://github.com/repinspl/php-cs-fixer-html-indent/pull/2)).
+
+## [0.1.3] - 2026-07-14
+
+### Fixed
+
+- Spurious indentation leaking into an unprotected PHP block (one with no HTML base indent) after an earlier block was dedented to column 0. The reindent fixer now strips that leaked indent from top-level blocks.
+
+## [0.1.2] - 2026-06-05
+
+### Fixed
+
+- Statements after the first one in a PHP block nested in HTML, inside a control structure split across an HTML island (e.g. `if ($x) { ?> ... <?php $a; $b; ?>`), were indented one level too deep.
+
+## [0.1.1] - 2026-03-10
+
+### Fixed
+
+- `IndentRegistry` push/shift desync across multiple PHP blocks, which made HTML-nested blocks lose their indentation and `<script>`-embedded blocks gain a wrong one.
+- Inline PHP blocks (`<?php echo ... ?>`) are now consistently skipped by both fixers.
+
+### Added
+
+- Contributing section in README.
+
 ## [0.1.0] - 2026-02-28
 
 ### Added
@@ -13,4 +45,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Support for both tab-based and space-based indentation (auto-detected from HTML context).
 - `IndentRegistry` for sharing indent data between dedent and reindent fixers.
 
+[0.1.4]: https://github.com/repinspl/php-cs-fixer-html-indent/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/repinspl/php-cs-fixer-html-indent/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/repinspl/php-cs-fixer-html-indent/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/repinspl/php-cs-fixer-html-indent/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/repinspl/php-cs-fixer-html-indent/releases/tag/v0.1.0
