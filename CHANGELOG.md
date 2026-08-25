@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+
+- A second (or later) top-level statement in a PHP block gained a spurious extra indentation level when the block's first statement spanned multiple lines (e.g. a call with a multi-line array argument) and the block sat inside a real, still-open brace scope (e.g. a class method). `detectFormatterBaseIndent()` was scanning into the first statement's own lines, whose relative-zero indentation isn't `statement_indentation`'s real-depth shift, which dragged the detected shift down to zero and left the later statement's already-shifted lines with `codeIndent` added on top instead of stripped first.
+
 ## [0.1.4] - 2026-08-22
 
 ### Fixed
