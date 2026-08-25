@@ -185,22 +185,21 @@ final class HtmlContextReindentFixer extends AbstractFixer
 	 * stripped before re-applying codeIndent so sibling statements line up with the
 	 * first one. The first statement is excluded on purpose: statement_indentation
 	 * leaves it at column 0 (the indenting newline lives in the T_OPEN_TAG token),
-	 * regardless of how many lines that first statement spans.
+	 * regardless of how many lines that first statement spans, so the scan starts
+	 * past $firstStatementEnd (see firstStatementEndIndex()).
 	 */
-	private function detectFormatterBaseIndent(Tokens $tokens, int $openIndex, int $closeIndex): string
+	private function detectFormatterBaseIndent(Tokens $tokens, int $firstStatementEnd, int $closeIndex): string
 	{
 		$min = null;
 
-		// Skip past the entire first statement, not just its first token: that
+		// Starts past the entire first statement, not just its first token: that
 		// statement is handled separately in reindentBlock() and, per the docblock
 		// above, statement_indentation leaves all of it at column 0 regardless of
 		// real brace depth — even a multi-line one (e.g. a call with an array
 		// argument). Including its later lines here would pull $min down to ''
 		// whenever the block sits inside control structures still open from
 		// outside it, hiding the real depth this method exists to detect.
-		$scanStart = $this->firstStatementEndIndex($tokens, $openIndex, $closeIndex) + 1;
-
-		for ($i = max($scanStart, $openIndex + 2); $i < $closeIndex; ++$i) {
+		for ($i = $firstStatementEnd + 1; $i < $closeIndex; ++$i) {
 			if (!$tokens[$i]->isGivenKind(T_WHITESPACE)) {
 				continue;
 			}
@@ -225,6 +224,11 @@ final class HtmlContextReindentFixer extends AbstractFixer
 	 * trailing semicolon). Bracket/paren/brace depth is tracked so a ';' or '}'
 	 * belonging to a nested array, call, or block (e.g. inside the array
 	 * argument of a call) isn't mistaken for the end of the statement.
+	 *
+	 * Alternative-syntax blocks (`if (...): ... endif;`) open no brace, so they
+	 * are counted as their own depth level — otherwise the ';' of the first
+	 * statement in their body would end the scan. The token set matches the one
+	 * isTopLevel() walks.
 	 */
 	private function firstStatementEndIndex(Tokens $tokens, int $openIndex, int $closeIndex): int
 	{
@@ -237,9 +241,17 @@ final class HtmlContextReindentFixer extends AbstractFixer
 				++$depth;
 			} elseif ($token->equals(')') || $token->equals(']')) {
 				--$depth;
+			} elseif ($token->isGivenKind([T_ENDIF, T_ENDFOR, T_ENDFOREACH, T_ENDWHILE, T_ENDSWITCH, T_ENDDECLARE])) {
+				--$depth;
+			} elseif (
+				// T_ELSEIF is absent on purpose, as in isTopLevel().
+				$token->isGivenKind([T_IF, T_FOR, T_FOREACH, T_WHILE, T_SWITCH, T_DECLARE])
+				&& $this->opensAlternativeSyntaxBlock($tokens, $i)
+			) {
+				++$depth;
 			} elseif ($token->equals('}')) {
 				--$depth;
-				if ($depth === 0) {
+				if ($depth === 0 && !$this->continuesStatement($tokens, $i)) {
 					return $i;
 				}
 			} elseif ($depth === 0 && $token->equals(';')) {
@@ -248,6 +260,35 @@ final class HtmlContextReindentFixer extends AbstractFixer
 		}
 
 		return $closeIndex;
+	}
+
+	/**
+	 * Tells whether the '}' at $index is followed by a keyword that carries the
+	 * same statement on instead of starting a new one. statement_indentation keeps
+	 * the whole `if`/`else`, `try`/`catch` or `do`/`while` construct in a single
+	 * statement scope, so its closing braces are not statement boundaries.
+	 */
+	private function continuesStatement(Tokens $tokens, int $index): bool
+	{
+		$nextIndex = $tokens->getNextMeaningfulToken($index);
+		if ($nextIndex === null) {
+			return false;
+		}
+
+		if ($tokens[$nextIndex]->isGivenKind([T_ELSE, T_ELSEIF, T_CATCH, T_FINALLY])) {
+			return true;
+		}
+
+		if (!$tokens[$nextIndex]->isGivenKind(T_WHILE)) {
+			return false;
+		}
+
+		// Only the `while` of a do-while continues the statement; a `while` loop
+		// that merely follows an unrelated block starts a new one.
+		$openBraceIndex = $tokens->findBlockStart(Tokens::BLOCK_TYPE_CURLY_BRACE, $index);
+		$beforeBraceIndex = $tokens->getPrevMeaningfulToken($openBraceIndex);
+
+		return $beforeBraceIndex !== null && $tokens[$beforeBraceIndex]->isGivenKind(T_DO);
 	}
 
 	private function detectIndentUnit(Tokens $tokens, int $openIndex, int $closeIndex): string
@@ -293,7 +334,7 @@ final class HtmlContextReindentFixer extends AbstractFixer
 		// this way, however many lines it spans, so it must not have this stripped —
 		// it gets codeIndent added on top of its own relative-zero indent instead.
 		$firstStatementEnd = $this->firstStatementEndIndex($tokens, $openIndex, $closeIndex);
-		$formatterBase = $this->detectFormatterBaseIndent($tokens, $openIndex, $closeIndex);
+		$formatterBase = $this->detectFormatterBaseIndent($tokens, $firstStatementEnd, $closeIndex);
 		$firstStatementPattern = '/\n(?!\n)/';
 		$laterStatementsPattern = '/\n' . preg_quote($formatterBase, '/') . '(?!\n)/';
 
@@ -308,12 +349,13 @@ final class HtmlContextReindentFixer extends AbstractFixer
 				// Non-whitespace token right after T_OPEN_TAG — insert code indent
 				$tokens->insertAt($firstIndex, new Token([T_WHITESPACE, $codeIndent]));
 				$closeIndex++;
+				$firstStatementEnd++;
 			} else {
 				// Regular whitespace token. Its last line is the lead-in for the
 				// first statement, which — per the docblock above — statement_indentation
 				// leaves at column 0 rather than at real brace depth; it always needs
 				// codeIndent, so it's replaced outright rather than detected via
-				// $stripPattern (which reflects lines 2+, not this one).
+				// $laterStatementsPattern (which reflects lines 2+, not this one).
 				$lastNewline = strrpos($firstContent, "\n");
 				$newContent = $lastNewline !== false
 					? substr($firstContent, 0, $lastNewline + 1) . $codeIndent

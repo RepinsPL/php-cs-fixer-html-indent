@@ -4,11 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.1.5] - 2026-08-25
 
 ### Fixed
 
-- A second (or later) top-level statement in a PHP block gained a spurious extra indentation level when the block's first statement spanned multiple lines (e.g. a call with a multi-line array argument) and the block sat inside a real, still-open brace scope (e.g. a class method). `detectFormatterBaseIndent()` was scanning into the first statement's own lines, whose relative-zero indentation isn't `statement_indentation`'s real-depth shift, which dragged the detected shift down to zero and left the later statement's already-shifted lines with `codeIndent` added on top instead of stripped first.
+- A second (or later) top-level statement in a PHP block gained a spurious extra indentation level when the block's first statement spanned multiple lines (e.g. a call with a multi-line array argument) and the block sat inside a real, still-open brace scope (e.g. a class method). `detectFormatterBaseIndent()` was scanning into the first statement's own lines, whose relative-zero indentation isn't `statement_indentation`'s real-depth shift, which dragged the detected shift down to zero and left the later statement's already-shifted lines with `codeIndent` added on top instead of stripped first ([#3](https://github.com/repinspl/php-cs-fixer-html-indent/issues/3)). Thanks to [@brianlmoon](https://github.com/brianlmoon) for reporting and fixing it ([#4](https://github.com/repinspl/php-cs-fixer-html-indent/pull/4)).
+- The same over-indentation in three more shapes of a first statement, where the detected boundary landed inside it: an `if`/`else`, a `try`/`catch`/`finally` (the `}` closing the first branch is not the end of the statement), and alternative syntax such as `if ($a): … endif;` (which opens no brace, so the first `;` of its body was taken as the end).
 
 ## [0.1.4] - 2026-08-22
 
@@ -51,6 +52,7 @@ Thanks to [@brianlmoon](https://github.com/brianlmoon) for reporting, fixing and
 - Support for both tab-based and space-based indentation (auto-detected from HTML context).
 - `IndentRegistry` for sharing indent data between dedent and reindent fixers.
 
+[0.1.5]: https://github.com/repinspl/php-cs-fixer-html-indent/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/repinspl/php-cs-fixer-html-indent/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/repinspl/php-cs-fixer-html-indent/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/repinspl/php-cs-fixer-html-indent/compare/v0.1.1...v0.1.2
