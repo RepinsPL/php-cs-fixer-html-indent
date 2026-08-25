@@ -184,18 +184,23 @@ final class HtmlContextReindentFixer extends AbstractFixer
 	 * across an HTML island, every line is shifted right by this amount; it must be
 	 * stripped before re-applying codeIndent so sibling statements line up with the
 	 * first one. The first statement is excluded on purpose: statement_indentation
-	 * leaves it at column 0 (the indenting newline lives in the T_OPEN_TAG token).
+	 * leaves it at column 0 (the indenting newline lives in the T_OPEN_TAG token),
+	 * regardless of how many lines that first statement spans.
 	 */
 	private function detectFormatterBaseIndent(Tokens $tokens, int $openIndex, int $closeIndex): string
 	{
 		$min = null;
 
-		// Starts at $openIndex + 2, past the first token: that one is handled
-		// separately in reindentBlock() and, per the docblock above, statement_indentation
-		// leaves it at column 0 regardless of real brace depth. Including it here would
-		// pull $min down to '' whenever the block sits inside control structures still
-		// open from outside it, hiding the real depth this method exists to detect.
-		for ($i = $openIndex + 2; $i < $closeIndex; ++$i) {
+		// Skip past the entire first statement, not just its first token: that
+		// statement is handled separately in reindentBlock() and, per the docblock
+		// above, statement_indentation leaves all of it at column 0 regardless of
+		// real brace depth — even a multi-line one (e.g. a call with an array
+		// argument). Including its later lines here would pull $min down to ''
+		// whenever the block sits inside control structures still open from
+		// outside it, hiding the real depth this method exists to detect.
+		$scanStart = $this->firstStatementEndIndex($tokens, $openIndex, $closeIndex) + 1;
+
+		for ($i = max($scanStart, $openIndex + 2); $i < $closeIndex; ++$i) {
 			if (!$tokens[$i]->isGivenKind(T_WHITESPACE)) {
 				continue;
 			}
@@ -211,6 +216,38 @@ final class HtmlContextReindentFixer extends AbstractFixer
 		}
 
 		return $min ?? '';
+	}
+
+	/**
+	 * Finds the index of the token that ends the first statement after
+	 * $openIndex: the first top-level ';' or the closing '}' of a first
+	 * statement that is itself a brace block (e.g. `if (...) { ... }` with no
+	 * trailing semicolon). Bracket/paren/brace depth is tracked so a ';' or '}'
+	 * belonging to a nested array, call, or block (e.g. inside the array
+	 * argument of a call) isn't mistaken for the end of the statement.
+	 */
+	private function firstStatementEndIndex(Tokens $tokens, int $openIndex, int $closeIndex): int
+	{
+		$depth = 0;
+
+		for ($i = $openIndex + 1; $i < $closeIndex; ++$i) {
+			$token = $tokens[$i];
+
+			if ($token->equals('(') || $token->equals('[') || $token->equals('{')) {
+				++$depth;
+			} elseif ($token->equals(')') || $token->equals(']')) {
+				--$depth;
+			} elseif ($token->equals('}')) {
+				--$depth;
+				if ($depth === 0) {
+					return $i;
+				}
+			} elseif ($depth === 0 && $token->equals(';')) {
+				return $i;
+			}
+		}
+
+		return $closeIndex;
 	}
 
 	private function detectIndentUnit(Tokens $tokens, int $openIndex, int $closeIndex): string
@@ -248,12 +285,17 @@ final class HtmlContextReindentFixer extends AbstractFixer
 
 	private function reindentBlock(Tokens $tokens, int $openIndex, int $closeIndex, string $codeIndent, string $baseIndent): void
 	{
-		// Base indent the formatter (e.g. statement_indentation) gave the whole block.
-		// When the block sits inside an outer control structure split across an HTML
-		// island, every line is shifted right by this amount; strip it before adding
-		// codeIndent so sibling statements line up, not just the first one.
+		// Base indent the formatter (e.g. statement_indentation) gave statements after
+		// the first one. When the block sits inside an outer control structure split
+		// across an HTML island, those lines are shifted right by this amount; strip
+		// it before adding codeIndent so sibling statements line up with the first.
+		// The first statement itself (see firstStatementEndIndex()) is never shifted
+		// this way, however many lines it spans, so it must not have this stripped —
+		// it gets codeIndent added on top of its own relative-zero indent instead.
+		$firstStatementEnd = $this->firstStatementEndIndex($tokens, $openIndex, $closeIndex);
 		$formatterBase = $this->detectFormatterBaseIndent($tokens, $openIndex, $closeIndex);
-		$stripPattern = '/\n' . preg_quote($formatterBase, '/') . '(?!\n)/';
+		$firstStatementPattern = '/\n(?!\n)/';
+		$laterStatementsPattern = '/\n' . preg_quote($formatterBase, '/') . '(?!\n)/';
 
 		// Handle first token after T_OPEN_TAG — may have been cleared by dedent
 		$firstIndex = $openIndex + 1;
@@ -300,7 +342,8 @@ final class HtmlContextReindentFixer extends AbstractFixer
 					$newContent = $content;
 				}
 			} else {
-				$newContent = preg_replace($stripPattern, "\n" . $codeIndent, $content);
+				$pattern = $i <= $firstStatementEnd ? $firstStatementPattern : $laterStatementsPattern;
+				$newContent = preg_replace($pattern, "\n" . $codeIndent, $content);
 			}
 
 			if ($newContent !== $content) {
